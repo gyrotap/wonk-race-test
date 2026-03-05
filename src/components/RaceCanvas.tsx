@@ -180,12 +180,14 @@ export default function RaceCanvas({ state }: Props) {
   }, [state]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={CANVAS_WIDTH}
-      height={CANVAS_HEIGHT}
-      className="border-2 border-gray-700 rounded-lg"
-      style={{ imageRendering: 'pixelated' }}
-    />
+    <div className="w-full max-w-[800px]">
+      <canvas
+        ref={canvasRef}
+        width={CANVAS_WIDTH}
+        height={CANVAS_HEIGHT}
+        className="border-2 border-gray-700 rounded-lg w-full h-auto"
+        style={{ imageRendering: 'pixelated' }}
+      />
+    </div>
   );
 }

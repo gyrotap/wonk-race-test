@@ -16,13 +16,13 @@ export default function Controls({ state, viewers, connected, onNextGeneration, 
   const canStart = state.status === 'waiting' || state.status === 'finished';
 
   return (
-    <div className="flex flex-col gap-4 p-4 bg-gray-900 rounded-lg border border-gray-700 w-full max-w-[800px]">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="flex flex-col gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-900 rounded-lg border border-gray-700 w-full max-w-[800px]">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button
             onClick={onNextGeneration}
             disabled={!canStart || !connected}
-            className={`px-6 py-3 rounded-lg font-bold text-lg transition-all ${
+            className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold text-base sm:text-lg transition-all flex-1 sm:flex-none ${
               canStart && connected
                 ? 'bg-green-600 hover:bg-green-500 text-white cursor-pointer'
                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
@@ -34,15 +34,15 @@ export default function Controls({ state, viewers, connected, onNextGeneration, 
               ? 'Racing...'
               : `Start Gen ${state.generation + 1}`}
           </button>
-          <div className="text-gray-400 text-sm">
+          <div className="text-gray-400 text-xs sm:text-sm whitespace-nowrap">
             <span className={connected ? 'text-green-400' : 'text-red-400'}>
               {connected ? '●' : '○'}
             </span>{' '}
             {viewers} viewer{viewers !== 1 ? 's' : ''}
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-gray-400 text-sm">
+        <div className="flex items-center gap-3 sm:gap-4 justify-between sm:justify-end">
+          <div className="text-gray-400 text-xs sm:text-sm">
             Generation: <span className="text-white font-bold">{state.generation}</span>
           </div>
           {state.generation > 0 && (
@@ -68,7 +68,7 @@ export default function Controls({ state, viewers, connected, onNextGeneration, 
 
       {/* Leaderboard */}
       {state.horses.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
           {[...state.horses]
             .sort((a, b) => {
               // Finished first, then alive sorted by distance to goal, then dead last

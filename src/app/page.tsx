@@ -8,9 +8,9 @@ export default function Home() {
   const { state, viewers, connected, sendNextGeneration, resetVotes, hasVotedReset, toggleResetVote } = useWebSocket();
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center p-4 gap-4">
-      <h1 className="text-4xl font-bold font-mono tracking-tight">Wonk Race Test</h1>
-      <p className="text-gray-400 text-base font-mono">
+    <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center px-2 py-4 sm:p-4 gap-3 sm:gap-4">
+      <h1 className="text-2xl sm:text-4xl font-bold font-mono tracking-tight text-center">Wonk Race Test</h1>
+      <p className="text-gray-400 text-xs sm:text-base font-mono text-center px-2">
         Genetic algorithm Wonk racing — Wonks evolve neural networks to navigate obstacles
       </p>
 

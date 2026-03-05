@@ -1,30 +1,44 @@
 import { Horse } from './horse';
 import { Obstacle, Pitfall, COURSE_WIDTH, COURSE_HEIGHT } from './course';
 
-const BOUNCE_DAMPING = 0.5;
+const BOUNCE_FACTOR = 1.2; // Bouncy! >1 means wonks ricochet harder than they hit
+const MIN_BOUNCE_SPEED = 2.0; // Minimum speed after a bounce to prevent getting stuck
+
+function ensureMinBounce(vx: number, vy: number): [number, number] {
+  const speed = Math.sqrt(vx * vx + vy * vy);
+  if (speed < MIN_BOUNCE_SPEED && speed > 0) {
+    const scale = MIN_BOUNCE_SPEED / speed;
+    return [vx * scale, vy * scale];
+  }
+  return [vx, vy];
+}
 
 export function handleCollisions(horse: Horse, obstacles: Obstacle[]) {
   const r = Horse.RADIUS;
 
-  // Boundary collisions
+  // Boundary collisions — aggressive bounce off walls
   if (horse.x - r < 0) {
     horse.x = r;
-    horse.vx = Math.abs(horse.vx) * BOUNCE_DAMPING;
+    horse.vx = Math.abs(horse.vx) * BOUNCE_FACTOR;
+    [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
   }
   if (horse.x + r > COURSE_WIDTH) {
     horse.x = COURSE_WIDTH - r;
-    horse.vx = -Math.abs(horse.vx) * BOUNCE_DAMPING;
+    horse.vx = -Math.abs(horse.vx) * BOUNCE_FACTOR;
+    [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
   }
   if (horse.y - r < 0) {
     horse.y = r;
-    horse.vy = Math.abs(horse.vy) * BOUNCE_DAMPING;
+    horse.vy = Math.abs(horse.vy) * BOUNCE_FACTOR;
+    [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
   }
   if (horse.y + r > COURSE_HEIGHT) {
     horse.y = COURSE_HEIGHT - r;
-    horse.vy = -Math.abs(horse.vy) * BOUNCE_DAMPING;
+    horse.vy = -Math.abs(horse.vy) * BOUNCE_FACTOR;
+    [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
   }
 
-  // Obstacle collisions (AABB vs circle)
+  // Obstacle collisions (AABB vs circle) — chaotic bouncing
   for (const obs of obstacles) {
     const closestX = Math.max(obs.x, Math.min(horse.x, obs.x + obs.w));
     const closestY = Math.max(obs.y, Math.min(horse.y, obs.y + obs.h));
@@ -33,29 +47,27 @@ export function handleCollisions(horse: Horse, obstacles: Obstacle[]) {
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist < r) {
-      // Push horse out of obstacle
       if (dist === 0) {
-        // Horse center is inside obstacle — push in the direction we came from
-        horse.x -= horse.vx * 2;
-        horse.y -= horse.vy * 2;
-        horse.vx *= -BOUNCE_DAMPING;
-        horse.vy *= -BOUNCE_DAMPING;
+        // Horse center is inside obstacle — launch it out hard
+        horse.x -= horse.vx * 3;
+        horse.y -= horse.vy * 3;
+        horse.vx *= -BOUNCE_FACTOR * 1.5;
+        horse.vy *= -BOUNCE_FACTOR * 1.5;
       } else {
         const nx = dx / dist;
         const ny = dy / dist;
         const overlap = r - dist;
-        horse.x += nx * overlap;
-        horse.y += ny * overlap;
+        horse.x += nx * (overlap + 1); // Extra push to clear the wall
+        horse.y += ny * (overlap + 1);
 
-        // Reflect velocity along the collision normal
+        // Reflect velocity along the collision normal and amplify
         const dot = horse.vx * nx + horse.vy * ny;
         if (dot < 0) {
-          horse.vx -= 2 * dot * nx;
-          horse.vy -= 2 * dot * ny;
-          horse.vx *= BOUNCE_DAMPING;
-          horse.vy *= BOUNCE_DAMPING;
+          horse.vx -= 2 * dot * nx * BOUNCE_FACTOR;
+          horse.vy -= 2 * dot * ny * BOUNCE_FACTOR;
         }
       }
+      [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
     }
   }
 }
