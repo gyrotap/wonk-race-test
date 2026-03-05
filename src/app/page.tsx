@@ -5,7 +5,7 @@ import RaceCanvas from '../components/RaceCanvas';
 import Controls from '../components/Controls';
 
 export default function Home() {
-  const { state, viewers, connected, sendNextGeneration } = useWebSocket();
+  const { state, viewers, connected, sendNextGeneration, resetVotes, hasVotedReset, toggleResetVote } = useWebSocket();
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center p-4 gap-4">
@@ -22,6 +22,9 @@ export default function Home() {
             viewers={viewers}
             connected={connected}
             onNextGeneration={sendNextGeneration}
+            resetVotes={resetVotes}
+            hasVotedReset={hasVotedReset}
+            onToggleResetVote={toggleResetVote}
           />
         </>
       ) : (

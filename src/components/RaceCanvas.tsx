@@ -91,13 +91,13 @@ export default function RaceCanvas({ state }: Props) {
       ctx.stroke();
     }
 
-    // Draw start line
-    ctx.strokeStyle = '#ffffff44';
+    // Draw start line (fixed at left side)
+    ctx.strokeStyle = '#ffffff22';
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
-    ctx.moveTo(state.horses[0]?.x ?? 60, 0);
-    ctx.lineTo(state.horses[0]?.x ?? 60, CANVAS_HEIGHT);
+    ctx.moveTo(60, 0);
+    ctx.lineTo(60, CANVAS_HEIGHT);
     ctx.stroke();
     ctx.setLineDash([]);
 

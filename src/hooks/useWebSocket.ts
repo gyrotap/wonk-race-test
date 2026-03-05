@@ -31,10 +31,17 @@ export interface GameState {
   bestFitnessHistory: number[];
 }
 
+export interface ResetVoteState {
+  votes: number;
+  needed: number;
+}
+
 export function useWebSocket() {
   const [state, setState] = useState<GameState | null>(null);
   const [viewers, setViewers] = useState(0);
   const [connected, setConnected] = useState(false);
+  const [resetVotes, setResetVotes] = useState<ResetVoteState>({ votes: 0, needed: 0 });
+  const [hasVotedReset, setHasVotedReset] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -48,7 +55,7 @@ export function useWebSocket() {
     ws.onopen = () => setConnected(true);
     ws.onclose = () => {
       setConnected(false);
-      // Auto-reconnect after 2 seconds
+      setHasVotedReset(false);
       reconnectTimeoutRef.current = setTimeout(connect, 2000);
     };
 
@@ -56,8 +63,18 @@ export function useWebSocket() {
       const msg = JSON.parse(event.data);
       if (msg.type === 'state') {
         setState(msg as GameState);
+        // Reset was triggered if gen went back to 0
+        if (msg.generation === 0) {
+          setHasVotedReset(false);
+        }
       } else if (msg.type === 'viewers') {
         setViewers(msg.count);
+      } else if (msg.type === 'reset_votes') {
+        setResetVotes({ votes: msg.votes, needed: msg.needed });
+        // If reset happened (votes went to 0), clear local vote
+        if (msg.votes === 0) {
+          setHasVotedReset(false);
+        }
       }
     };
   }, []);
@@ -76,5 +93,16 @@ export function useWebSocket() {
     }
   }, []);
 
-  return { state, viewers, connected, sendNextGeneration };
+  const toggleResetVote = useCallback(() => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    if (hasVotedReset) {
+      wsRef.current.send(JSON.stringify({ type: 'unvote_reset' }));
+      setHasVotedReset(false);
+    } else {
+      wsRef.current.send(JSON.stringify({ type: 'vote_reset' }));
+      setHasVotedReset(true);
+    }
+  }, [hasVotedReset]);
+
+  return { state, viewers, connected, sendNextGeneration, resetVotes, hasVotedReset, toggleResetVote };
 }

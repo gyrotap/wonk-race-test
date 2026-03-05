@@ -1,15 +1,18 @@
 'use client';
 
-import { GameState } from '../hooks/useWebSocket';
+import { GameState, ResetVoteState } from '../hooks/useWebSocket';
 
 interface Props {
   state: GameState;
   viewers: number;
   connected: boolean;
   onNextGeneration: () => void;
+  resetVotes: ResetVoteState;
+  hasVotedReset: boolean;
+  onToggleResetVote: () => void;
 }
 
-export default function Controls({ state, viewers, connected, onNextGeneration }: Props) {
+export default function Controls({ state, viewers, connected, onNextGeneration, resetVotes, hasVotedReset, onToggleResetVote }: Props) {
   const canStart = state.status === 'waiting' || state.status === 'finished';
 
   return (
@@ -38,8 +41,28 @@ export default function Controls({ state, viewers, connected, onNextGeneration }
             {viewers} viewer{viewers !== 1 ? 's' : ''}
           </div>
         </div>
-        <div className="text-gray-400 text-sm">
-          Generation: <span className="text-white font-bold">{state.generation}</span>
+        <div className="flex items-center gap-4">
+          <div className="text-gray-400 text-sm">
+            Generation: <span className="text-white font-bold">{state.generation}</span>
+          </div>
+          {state.generation > 0 && (
+            <button
+              onClick={onToggleResetVote}
+              disabled={!connected}
+              className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+                hasVotedReset
+                  ? 'bg-red-700 hover:bg-red-600 text-white'
+                  : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+              }`}
+            >
+              {hasVotedReset ? 'Voted Reset' : 'Vote Reset'}
+              {resetVotes.needed > 0 && (
+                <span className="ml-1.5 text-gray-400">
+                  {resetVotes.votes}/{resetVotes.needed}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 

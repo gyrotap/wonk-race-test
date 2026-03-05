@@ -55,10 +55,25 @@ app.prepare().then(() => {
   }
 
   const simulation = new Simulation(broadcast);
+  const resetVotes = new Set<WebSocket>();
+
+  function broadcastResetVotes() {
+    const data = JSON.stringify({
+      type: 'reset_votes',
+      votes: resetVotes.size,
+      needed: clients.size,
+    });
+    for (const client of clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(data);
+      }
+    }
+  }
 
   wss.on('connection', (ws) => {
     clients.add(ws);
     broadcastViewerCount();
+    broadcastResetVotes();
 
     // Send current state to the new client
     ws.send(JSON.stringify({ type: 'state', ...simulation.getState() }));
@@ -69,6 +84,20 @@ app.prepare().then(() => {
         if (msg.type === 'next_generation') {
           simulation.startNextGeneration();
         }
+        if (msg.type === 'vote_reset') {
+          resetVotes.add(ws);
+          broadcastResetVotes();
+          // Check if all viewers voted
+          if (resetVotes.size >= clients.size && clients.size > 0) {
+            resetVotes.clear();
+            simulation.reset();
+            broadcastResetVotes();
+          }
+        }
+        if (msg.type === 'unvote_reset') {
+          resetVotes.delete(ws);
+          broadcastResetVotes();
+        }
       } catch {
         // ignore malformed messages
       }
@@ -76,7 +105,15 @@ app.prepare().then(() => {
 
     ws.on('close', () => {
       clients.delete(ws);
+      resetVotes.delete(ws);
       broadcastViewerCount();
+      broadcastResetVotes();
+      // Re-check if remaining voters are now unanimous
+      if (resetVotes.size >= clients.size && clients.size > 0) {
+        resetVotes.clear();
+        simulation.reset();
+        broadcastResetVotes();
+      }
     });
   });
 
