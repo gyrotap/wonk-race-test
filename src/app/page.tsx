@@ -9,9 +9,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center p-4 gap-4">
-      <h1 className="text-2xl font-bold font-mono">Wonk Race Test</h1>
-      <p className="text-gray-500 text-sm font-mono">
-        Genetic algorithm wonk racing — wonks evolve neural networks to navigate obstacles
+      <h1 className="text-4xl font-bold font-mono tracking-tight">Wonk Race Test</h1>
+      <p className="text-gray-400 text-base font-mono">
+        Genetic algorithm Wonk racing — Wonks evolve neural networks to navigate obstacles
       </p>
 
       {state ? (
