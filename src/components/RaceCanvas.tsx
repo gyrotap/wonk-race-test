@@ -10,12 +10,25 @@ interface Props {
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 
+const POWERUP_COLORS: Record<string, string> = {
+  speed: '#00FF88',
+  shield: '#4488FF',
+  zap: '#FF4444',
+  magnet: '#FFD700',
+};
+
+const POWERUP_LABELS: Record<string, string> = {
+  speed: 'SPD',
+  shield: 'SHD',
+  zap: 'ZAP',
+  magnet: 'MAG',
+};
+
 export default function RaceCanvas({ state }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const spritesRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const spritesLoadedRef = useRef(false);
 
-  // Load wonk sprites
   useEffect(() => {
     const sprites = new Map<string, HTMLImageElement>();
     let loaded = 0;
@@ -68,7 +81,7 @@ export default function RaceCanvas({ state }: Props) {
     ctx.font = '16px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🥕', state.goalX, state.goalY);
+    ctx.fillText('\uD83E\uDD55', state.goalX, state.goalY);
 
     // Draw pitfalls
     for (const pit of (state.pitfalls || [])) {
@@ -79,7 +92,6 @@ export default function RaceCanvas({ state }: Props) {
       ctx.strokeStyle = '#FF4444';
       ctx.lineWidth = 2;
       ctx.stroke();
-      // Draw X pattern
       ctx.strokeStyle = '#FF666688';
       ctx.lineWidth = 2;
       const r = pit.radius * 0.6;
@@ -91,7 +103,35 @@ export default function RaceCanvas({ state }: Props) {
       ctx.stroke();
     }
 
-    // Draw start line (fixed at left side)
+    // Draw powerup items on the course
+    for (const item of (state.powerupItems || [])) {
+      const color = POWERUP_COLORS[item.type] || '#fff';
+      const label = POWERUP_LABELS[item.type] || '?';
+
+      // Pulsing glow
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(item.x, item.y, 18, 0, Math.PI * 2);
+      ctx.fillStyle = color + '33';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(item.x, item.y, 12, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff88';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 8px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, item.x, item.y);
+      ctx.restore();
+    }
+
+    // Draw start line
     ctx.strokeStyle = '#ffffff22';
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
@@ -101,16 +141,75 @@ export default function RaceCanvas({ state }: Props) {
     ctx.stroke();
     ctx.setLineDash([]);
 
+    // Draw projectiles (zap bolts)
+    for (const proj of (state.projectiles || [])) {
+      const target = state.horses.find(h => h.id === proj.targetSlot);
+      if (!target) continue;
+
+      ctx.save();
+      ctx.strokeStyle = '#FF4444';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#FF4444';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(proj.x, proj.y);
+      // Lightning zigzag toward target
+      const dx = target.x - proj.x;
+      const dy = target.y - proj.y;
+      const steps = 4;
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const jitterX = i < steps ? (Math.random() - 0.5) * 20 : 0;
+        const jitterY = i < steps ? (Math.random() - 0.5) * 20 : 0;
+        ctx.lineTo(proj.x + dx * t + jitterX, proj.y + dy * t + jitterY);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Draw horses
     for (const horse of state.horses) {
       const sprite = spritesRef.current.get(horse.spriteId);
       const spriteSize = 28;
-
       const isDimmed = horse.finished || horse.dead;
 
+      // Draw effect auras
+      ctx.save();
+      if (horse.shielded) {
+        ctx.beginPath();
+        ctx.arc(horse.x, horse.y, 18, 0, Math.PI * 2);
+        ctx.strokeStyle = '#4488FF88';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+      if (horse.speedBoosted) {
+        ctx.beginPath();
+        ctx.arc(horse.x, horse.y, 20, 0, Math.PI * 2);
+        ctx.strokeStyle = '#00FF8866';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (horse.magnetized) {
+        ctx.beginPath();
+        ctx.arc(horse.x, horse.y, 20, 0, Math.PI * 2);
+        ctx.strokeStyle = '#FFD70066';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (horse.stunned) {
+        ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 100) * 0.3;
+      }
+      ctx.restore();
+
+      // Draw the wonk
       if (sprite && sprite.complete && sprite.naturalWidth > 0) {
         ctx.save();
         if (isDimmed) ctx.globalAlpha = horse.dead ? 0.3 : 0.5;
+        if (horse.stunned) ctx.globalAlpha = 0.4;
         ctx.drawImage(
           sprite,
           horse.x - spriteSize / 2,
@@ -122,14 +221,14 @@ export default function RaceCanvas({ state }: Props) {
       } else {
         ctx.beginPath();
         ctx.arc(horse.x, horse.y, 12, 0, Math.PI * 2);
-        ctx.fillStyle = isDimmed ? horse.color + '60' : horse.color;
+        ctx.fillStyle = isDimmed ? horse.color + '60' : horse.stunned ? horse.color + '66' : horse.color;
         ctx.fill();
-        ctx.strokeStyle = horse.dead ? '#FF4444' : '#fff';
+        ctx.strokeStyle = horse.dead ? '#FF4444' : horse.stunned ? '#888888' : '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
       }
 
-      // Draw dead X over horse
+      // Dead X
       if (horse.dead) {
         ctx.strokeStyle = '#FF4444';
         ctx.lineWidth = 3;
@@ -141,14 +240,34 @@ export default function RaceCanvas({ state }: Props) {
         ctx.stroke();
       }
 
-      // Draw name label
-      ctx.fillStyle = horse.dead ? '#ff6666' : '#fff';
+      // Stun stars
+      if (horse.stunned) {
+        ctx.fillStyle = '#FFD700';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('*  *  *', horse.x, horse.y - 22);
+      }
+
+      // Held powerup indicator
+      if (horse.heldPowerup && !horse.dead) {
+        const pColor = POWERUP_COLORS[horse.heldPowerup] || '#fff';
+        ctx.beginPath();
+        ctx.arc(horse.x + 14, horse.y - 14, 6, 0, Math.PI * 2);
+        ctx.fillStyle = pColor;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // Name label
+      ctx.fillStyle = horse.dead ? '#ff6666' : horse.stunned ? '#888888' : '#fff';
       ctx.font = '10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(horse.name, horse.x, horse.y - 18);
+      ctx.fillText(horse.name, horse.x, horse.y - (horse.stunned ? 30 : 18));
     }
 
-    // Draw generation + timer overlay
+    // Gen + timer overlay
     ctx.fillStyle = '#ffffffcc';
     ctx.font = 'bold 16px monospace';
     ctx.textAlign = 'left';

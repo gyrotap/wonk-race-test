@@ -3,6 +3,7 @@ import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Simulation, SimState } from './simulation';
+import { BettingSystem } from './betting';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = '0.0.0.0';
@@ -16,7 +17,6 @@ app.prepare().then(() => {
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url!, true);
 
-    // Admin reset endpoint: POST /api/reset?secret=your-secret
     if (parsedUrl.pathname === '/api/reset' && req.method === 'POST') {
       if (parsedUrl.query.secret === ADMIN_SECRET) {
         simulation.reset();
@@ -32,9 +32,9 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl);
   });
 
-  // Don't attach to server directly — handle upgrade manually to avoid conflicting with Next.js HMR
   const wss = new WebSocketServer({ noServer: true });
   const clients = new Set<WebSocket>();
+  const betting = new BettingSystem();
 
   function broadcast(state: SimState) {
     const data = JSON.stringify({ type: 'state', ...state });
@@ -54,8 +54,39 @@ app.prepare().then(() => {
     }
   }
 
+  function sendWallet(ws: WebSocket) {
+    const wallet = betting.getWallet(ws);
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'wallet',
+        balance: wallet.balance,
+        currentBet: wallet.currentBet,
+      }));
+    }
+  }
+
   const simulation = new Simulation(broadcast);
   const resetVotes = new Set<WebSocket>();
+
+  // Handle race end for betting
+  simulation.onRaceEnd = (winnerSlot: number | null) => {
+    betting.givePassiveIncome();
+    const results = betting.resolveBets(winnerSlot);
+
+    for (const [ws, result] of results) {
+      if ((ws as WebSocket).readyState === WebSocket.OPEN) {
+        (ws as WebSocket).send(JSON.stringify({
+          type: 'bet_result',
+          won: result.won,
+          payout: result.payout,
+        }));
+      }
+    }
+
+    for (const client of clients) {
+      sendWallet(client);
+    }
+  };
 
   function broadcastResetVotes() {
     const data = JSON.stringify({
@@ -75,28 +106,57 @@ app.prepare().then(() => {
     broadcastViewerCount();
     broadcastResetVotes();
 
-    // Send current state to the new client
     ws.send(JSON.stringify({ type: 'state', ...simulation.getState() }));
+    sendWallet(ws);
 
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
+
         if (msg.type === 'next_generation') {
           simulation.startNextGeneration();
         }
+
         if (msg.type === 'vote_reset') {
           resetVotes.add(ws);
           broadcastResetVotes();
-          // Check if all viewers voted
           if (resetVotes.size >= clients.size && clients.size > 0) {
             resetVotes.clear();
             simulation.reset();
             broadcastResetVotes();
           }
         }
+
         if (msg.type === 'unvote_reset') {
           resetVotes.delete(ws);
           broadcastResetVotes();
+        }
+
+        // Powerup activation — any viewer can fire any wonk's powerup
+        if (msg.type === 'activate_powerup' && typeof msg.slot === 'number') {
+          simulation.activatePowerup(msg.slot);
+        }
+
+        // Betting
+        if (msg.type === 'place_bet' && typeof msg.slot === 'number' && typeof msg.amount === 'number') {
+          const result = betting.placeBet(ws, msg.slot, msg.amount);
+          ws.send(JSON.stringify({ type: 'bet_response', ...result }));
+          sendWallet(ws);
+        }
+
+        if (msg.type === 'cashout') {
+          const code = betting.cashout(ws);
+          if (code) {
+            ws.send(JSON.stringify({ type: 'cashout_code', code, balance: betting.getWallet(ws).balance }));
+          } else {
+            ws.send(JSON.stringify({ type: 'cashout_code', code: null, message: 'No tokens to cash out' }));
+          }
+        }
+
+        if (msg.type === 'redeem_code' && typeof msg.code === 'string') {
+          const result = betting.redeemCode(ws, msg.code);
+          ws.send(JSON.stringify({ type: 'redeem_result', ...result }));
+          sendWallet(ws);
         }
       } catch {
         // ignore malformed messages
@@ -106,9 +166,9 @@ app.prepare().then(() => {
     ws.on('close', () => {
       clients.delete(ws);
       resetVotes.delete(ws);
+      betting.removeWallet(ws);
       broadcastViewerCount();
       broadcastResetVotes();
-      // Re-check if remaining voters are now unanimous
       if (resetVotes.size >= clients.size && clients.size > 0) {
         resetVotes.clear();
         simulation.reset();
@@ -117,14 +177,9 @@ app.prepare().then(() => {
     });
   });
 
-  // Handle WebSocket upgrades manually — let Next.js HMR through, handle our own WS
   server.on('upgrade', (req, socket, head) => {
     const { pathname } = parse(req.url!, true);
-
-    // Only handle our /ws path — everything else (including HMR) passes through
-    if (pathname !== '/ws') {
-      return;
-    }
+    if (pathname !== '/ws') return;
 
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit('connection', ws, req);

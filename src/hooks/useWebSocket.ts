@@ -16,12 +16,30 @@ export interface HorseState {
   dead: boolean;
   finishTime: number | null;
   distToGoal: number;
+  stunned: boolean;
+  shielded: boolean;
+  speedBoosted: boolean;
+  magnetized: boolean;
+  heldPowerup: string | null;
 }
 
 export interface WinCount {
   slot: number;
   name: string;
   wins: number;
+}
+
+export interface PowerupItemState {
+  id: number;
+  type: string;
+  x: number;
+  y: number;
+}
+
+export interface ProjectileState {
+  x: number;
+  y: number;
+  targetSlot: number;
 }
 
 export interface GameState {
@@ -36,11 +54,23 @@ export interface GameState {
   winner: string | null;
   bestFitnessHistory: number[];
   winCounts: WinCount[];
+  powerupItems: PowerupItemState[];
+  projectiles: ProjectileState[];
 }
 
 export interface ResetVoteState {
   votes: number;
   needed: number;
+}
+
+export interface WalletState {
+  balance: number;
+  currentBet: { slot: number; amount: number } | null;
+}
+
+export interface BetResult {
+  won: boolean;
+  payout: number;
 }
 
 export function useWebSocket() {
@@ -49,6 +79,10 @@ export function useWebSocket() {
   const [connected, setConnected] = useState(false);
   const [resetVotes, setResetVotes] = useState<ResetVoteState>({ votes: 0, needed: 0 });
   const [hasVotedReset, setHasVotedReset] = useState(false);
+  const [wallet, setWallet] = useState<WalletState>({ balance: 100, currentBet: null });
+  const [betResult, setBetResult] = useState<BetResult | null>(null);
+  const [cashoutCode, setCashoutCode] = useState<string | null>(null);
+  const [redeemMessage, setRedeemMessage] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -68,20 +102,31 @@ export function useWebSocket() {
 
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
+
       if (msg.type === 'state') {
         setState(msg as GameState);
-        // Reset was triggered if gen went back to 0
         if (msg.generation === 0) {
           setHasVotedReset(false);
+        }
+        // Clear bet result when new race starts
+        if (msg.status === 'racing') {
+          setBetResult(null);
         }
       } else if (msg.type === 'viewers') {
         setViewers(msg.count);
       } else if (msg.type === 'reset_votes') {
         setResetVotes({ votes: msg.votes, needed: msg.needed });
-        // If reset happened (votes went to 0), clear local vote
         if (msg.votes === 0) {
           setHasVotedReset(false);
         }
+      } else if (msg.type === 'wallet') {
+        setWallet({ balance: msg.balance, currentBet: msg.currentBet });
+      } else if (msg.type === 'bet_result') {
+        setBetResult({ won: msg.won, payout: msg.payout });
+      } else if (msg.type === 'cashout_code') {
+        setCashoutCode(msg.code);
+      } else if (msg.type === 'redeem_result') {
+        setRedeemMessage(msg.message);
       }
     };
   }, []);
@@ -111,5 +156,35 @@ export function useWebSocket() {
     }
   }, [hasVotedReset]);
 
-  return { state, viewers, connected, sendNextGeneration, resetVotes, hasVotedReset, toggleResetVote };
+  const activatePowerup = useCallback((slot: number) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'activate_powerup', slot }));
+    }
+  }, []);
+
+  const placeBet = useCallback((slot: number, amount: number) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'place_bet', slot, amount }));
+    }
+  }, []);
+
+  const cashout = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'cashout' }));
+    }
+  }, []);
+
+  const redeemCode = useCallback((code: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'redeem_code', code }));
+      setCashoutCode(null);
+    }
+  }, []);
+
+  return {
+    state, viewers, connected, sendNextGeneration,
+    resetVotes, hasVotedReset, toggleResetVote,
+    activatePowerup,
+    wallet, placeBet, betResult, cashout, cashoutCode, redeemCode, redeemMessage,
+  };
 }

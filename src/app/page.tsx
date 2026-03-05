@@ -3,9 +3,15 @@
 import { useWebSocket } from '../hooks/useWebSocket';
 import RaceCanvas from '../components/RaceCanvas';
 import Controls from '../components/Controls';
+import BettingPanel from '../components/BettingPanel';
 
 export default function Home() {
-  const { state, viewers, connected, sendNextGeneration, resetVotes, hasVotedReset, toggleResetVote } = useWebSocket();
+  const {
+    state, viewers, connected, sendNextGeneration,
+    resetVotes, hasVotedReset, toggleResetVote,
+    activatePowerup,
+    wallet, placeBet, betResult, cashout, cashoutCode, redeemCode, redeemMessage,
+  } = useWebSocket();
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center px-2 py-4 sm:p-4 gap-3 sm:gap-4">
@@ -25,6 +31,18 @@ export default function Home() {
             resetVotes={resetVotes}
             hasVotedReset={hasVotedReset}
             onToggleResetVote={toggleResetVote}
+            onActivatePowerup={activatePowerup}
+          />
+          <BettingPanel
+            state={state}
+            wallet={wallet}
+            betResult={betResult}
+            cashoutCode={cashoutCode}
+            redeemMessage={redeemMessage}
+            connected={connected}
+            onPlaceBet={placeBet}
+            onCashout={cashout}
+            onRedeemCode={redeemCode}
           />
         </>
       ) : (
