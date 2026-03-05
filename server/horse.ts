@@ -43,9 +43,9 @@ export class Horse {
   finishTime: number | null;
 
   static readonly MAX_SPEED = 4;
-  static readonly BOUNCE_MAX_SPEED = 8; // bounces can go faster than normal movement
-  static readonly ACCELERATION = 0.35;
-  static readonly FRICTION = 0.97;
+  static readonly BOUNCE_MAX_SPEED = 10; // bounces can go way faster
+  static readonly ACCELERATION = 0.5;
+  static readonly FRICTION = 0.96;
   static readonly RADIUS = 12;
 
   constructor(id: number, name: string, brain: NeuralNetwork, startX: number, startY: number) {

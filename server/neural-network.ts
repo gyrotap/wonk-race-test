@@ -14,9 +14,9 @@ export class NeuralNetwork {
     if (weights) {
       this.weights = [...weights];
     } else {
-      // Small random initial weights so early gens are chaotic
+      // Larger random weights so early gens move aggressively in random directions
       this.weights = Array.from({ length: NeuralNetwork.GENOME_LENGTH }, () =>
-        (Math.random() - 0.5) * 0.5
+        (Math.random() - 0.5) * 2.0
       );
     }
   }
