@@ -42,9 +42,10 @@ export class Horse {
   dead: boolean;
   finishTime: number | null;
 
-  static readonly MAX_SPEED = 3;
-  static readonly ACCELERATION = 0.4;
-  static readonly FRICTION = 0.98;
+  static readonly MAX_SPEED = 4;
+  static readonly BOUNCE_MAX_SPEED = 8; // bounces can go faster than normal movement
+  static readonly ACCELERATION = 0.35;
+  static readonly FRICTION = 0.97;
   static readonly RADIUS = 12;
 
   constructor(id: number, name: string, brain: NeuralNetwork, startX: number, startY: number) {
@@ -94,11 +95,11 @@ export class Horse {
     this.vx *= Horse.FRICTION;
     this.vy *= Horse.FRICTION;
 
-    // Cap speed
+    // Cap speed — allow higher speed for bounces, NN-driven movement caps lower
     const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-    if (speed > Horse.MAX_SPEED) {
-      this.vx = (this.vx / speed) * Horse.MAX_SPEED;
-      this.vy = (this.vy / speed) * Horse.MAX_SPEED;
+    if (speed > Horse.BOUNCE_MAX_SPEED) {
+      this.vx = (this.vx / speed) * Horse.BOUNCE_MAX_SPEED;
+      this.vy = (this.vy / speed) * Horse.BOUNCE_MAX_SPEED;
     }
 
     this.x += this.vx;

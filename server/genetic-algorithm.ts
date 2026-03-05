@@ -1,5 +1,3 @@
-import { NeuralNetwork } from './neural-network';
-
 const MUTATION_RATE = 0.03;
 const MUTATION_STRENGTH = 0.15;
 const ELITISM_COUNT = 1;
@@ -7,7 +5,7 @@ const ELITISM_COUNT = 1;
 interface Individual {
   genome: number[];
   fitness: number;
-  name: string;
+  slot: number; // permanent slot index (0-7), tied to name + sprite
 }
 
 function tournamentSelect(population: Individual[]): Individual {
@@ -43,28 +41,31 @@ function mutate(genome: number[]): number[] {
 }
 
 export function evolve(
-  horses: { genome: number[]; fitness: number; name: string }[],
-  generateName: () => string
-): { genome: number[]; name: string }[] {
+  horses: { genome: number[]; fitness: number; slot: number }[]
+): { genome: number[]; slot: number }[] {
   const sorted = [...horses].sort((a, b) => b.fitness - a.fitness);
-  const newPopulation: { genome: number[]; name: string }[] = [];
+  const newPopulation: { genome: number[]; slot: number }[] = [];
 
-  // Elitism: keep the top horse unchanged
+  // Elitism: keep the top horse unchanged (same slot = same name + sprite)
   for (let i = 0; i < ELITISM_COUNT && i < sorted.length; i++) {
     newPopulation.push({
       genome: [...sorted[i].genome],
-      name: sorted[i].name, // keep their name — they're a returning champion
+      slot: sorted[i].slot,
     });
   }
 
-  // Fill rest with offspring
+  // Fill rest with offspring — assign remaining slots
+  const usedSlots = new Set(newPopulation.map(p => p.slot));
+  const freeSlots = horses.map(h => h.slot).filter(s => !usedSlots.has(s));
+
+  let slotIdx = 0;
   while (newPopulation.length < horses.length) {
     const parent1 = tournamentSelect(sorted);
     const parent2 = tournamentSelect(sorted);
     const childGenome = mutate(singlePointCrossover(parent1.genome, parent2.genome));
     newPopulation.push({
       genome: childGenome,
-      name: generateName(),
+      slot: freeSlots[slotIdx++],
     });
   }
 

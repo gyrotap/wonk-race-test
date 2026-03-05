@@ -107,8 +107,10 @@ function pathExists(obstacles: Obstacle[], startX: number, startY: number, goalX
 export function generateCourse(numObstacles = 12, numPitfalls = 5): Course {
   const startX = START_MARGIN;
   const startY = COURSE_HEIGHT / 2;
-  const goalX = COURSE_WIDTH - START_MARGIN;
-  const goalY = COURSE_HEIGHT / 2;
+
+  // Randomize goal position — anywhere in the right 60% of the map, with some Y variance
+  const goalX = COURSE_WIDTH * 0.4 + Math.random() * (COURSE_WIDTH * 0.55 - START_MARGIN);
+  const goalY = 60 + Math.random() * (COURSE_HEIGHT - 120);
 
   let obstacles: Obstacle[];
   let attempts = 0;

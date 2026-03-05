@@ -3,7 +3,7 @@ import { NeuralNetwork } from './neural-network';
 import { Course, generateCourse } from './course';
 import { handleCollisions, getNearestWalls, checkGoal, checkPitfalls } from './physics';
 import { evolve } from './genetic-algorithm';
-import { generateHorseName, generateUniqueNames } from './names';
+import { WONK_NAMES } from './names';
 
 export type SimStatus = 'waiting' | 'racing' | 'finished';
 
@@ -18,10 +18,11 @@ export interface SimState {
   timeLeft: number;
   winner: string | null;
   bestFitnessHistory: number[];
+  winCounts: { slot: number; name: string; wins: number }[];
 }
 
 const POPULATION_SIZE = 8;
-const MAX_TICKS = 900; // 15 seconds at 60fps
+const MAX_TICKS = 1800; // 30 seconds at 60fps
 const TICK_RATE = 1000 / 60;
 const BROADCAST_EVERY = 2; // send state every 2 ticks (~30fps to clients)
 
@@ -33,7 +34,8 @@ export class Simulation {
   ticks: number = 0;
   winner: string | null = null;
   bestFitnessHistory: number[] = [];
-  private genomes: { genome: number[]; name: string }[] = [];
+  winCounts: number[] = new Array(8).fill(0); // wins per slot
+  private genomes: { genome: number[]; slot: number }[] = [];
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private onBroadcast: (state: SimState) => void;
 
@@ -41,11 +43,10 @@ export class Simulation {
     this.onBroadcast = onBroadcast;
     this.course = generateCourse();
 
-    // Initialize first generation with random brains
-    const names = generateUniqueNames(POPULATION_SIZE);
-    this.genomes = names.map(name => ({
+    // Initialize first generation with random brains — each slot is permanent
+    this.genomes = Array.from({ length: POPULATION_SIZE }, (_, i) => ({
       genome: new NeuralNetwork().weights,
-      name,
+      slot: i,
     }));
   }
 
@@ -61,25 +62,30 @@ export class Simulation {
       timeLeft: Math.max(0, Math.ceil((MAX_TICKS - this.ticks) / 60)),
       winner: this.winner,
       bestFitnessHistory: this.bestFitnessHistory,
+      winCounts: WONK_NAMES.map((name, slot) => ({ slot, name, wins: this.winCounts[slot] })),
     };
   }
 
   startNextGeneration() {
-    if (this.status === 'racing') return; // Can't start while racing
+    if (this.status === 'racing') return;
 
     this.generation++;
     this.ticks = 0;
     this.winner = null;
     this.status = 'racing';
 
-    // Generate a new course each generation
-    this.course = generateCourse();
+    // Generate a new course — difficulty scales with generation
+    const baseObstacles = 10;
+    const basePitfalls = 4;
+    const extraObstacles = Math.min(Math.floor(this.generation / 3), 15);
+    const extraPitfalls = Math.min(Math.floor(this.generation / 4), 10);
+    this.course = generateCourse(baseObstacles + extraObstacles, basePitfalls + extraPitfalls);
 
     // Stagger start positions vertically
     const spacing = this.course.height / (POPULATION_SIZE + 1);
-    this.horses = this.genomes.map((g, i) => {
+    this.horses = this.genomes.map((g) => {
       const brain = new NeuralNetwork(g.genome);
-      return new Horse(i, g.name, brain, this.course.startX, spacing * (i + 1));
+      return new Horse(g.slot, WONK_NAMES[g.slot], brain, this.course.startX, spacing * (g.slot + 1));
     });
 
     // Start the simulation loop
@@ -117,6 +123,7 @@ export class Simulation {
         horse.finishTime = this.ticks;
         if (!this.winner) {
           this.winner = horse.name;
+          this.winCounts[horse.id]++;
         }
       }
     }
@@ -151,19 +158,14 @@ export class Simulation {
     const bestFitness = Math.max(...this.horses.map(h => h.fitness));
     this.bestFitnessHistory.push(Math.round(bestFitness));
 
-    // Evolve for next generation
+    // Evolve for next generation — slots stay permanent
     const individuals = this.horses.map(h => ({
       genome: h.brain.weights,
       fitness: h.fitness,
-      name: h.name,
+      slot: h.id,
     }));
 
-    const existingNames = individuals.map(i => i.name);
-    this.genomes = evolve(individuals, () => {
-      const [name] = generateUniqueNames(1, existingNames);
-      existingNames.push(name);
-      return name;
-    });
+    this.genomes = evolve(individuals);
 
     // Broadcast final state
     this.onBroadcast(this.getState());
@@ -181,12 +183,12 @@ export class Simulation {
     this.ticks = 0;
     this.winner = null;
     this.bestFitnessHistory = [];
+    this.winCounts = new Array(8).fill(0);
     this.course = generateCourse();
 
-    const names = generateUniqueNames(POPULATION_SIZE);
-    this.genomes = names.map(name => ({
+    this.genomes = Array.from({ length: POPULATION_SIZE }, (_, i) => ({
       genome: new NeuralNetwork().weights,
-      name,
+      slot: i,
     }));
 
     this.onBroadcast(this.getState());

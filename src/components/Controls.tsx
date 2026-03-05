@@ -2,6 +2,11 @@
 
 import { GameState, ResetVoteState } from '../hooks/useWebSocket';
 
+const WONK_COLORS = [
+  '#FF4444', '#4488FF', '#44CC44', '#FFAA00',
+  '#CC44CC', '#00CCCC', '#FFFF44', '#FF88CC',
+];
+
 interface Props {
   state: GameState;
   viewers: number;
@@ -100,6 +105,34 @@ export default function Controls({ state, viewers, connected, onNextGeneration, 
                 {horse.dead && <span className="text-red-500 text-xs ml-auto">Dead</span>}
               </div>
             ))}
+        </div>
+      )}
+
+      {/* All-time wins leaderboard */}
+      {state.winCounts && state.winCounts.some(w => w.wins > 0) && (
+        <div className="border-t border-gray-700 pt-3">
+          <div className="text-gray-400 text-xs font-bold mb-2 uppercase tracking-wider">All-Time Wins</div>
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
+            {[...state.winCounts]
+              .sort((a, b) => b.wins - a.wins)
+              .map((wc) => (
+                <div
+                  key={wc.slot}
+                  className={`flex items-center gap-2 p-2 rounded text-sm ${
+                    wc.wins > 0 ? 'bg-yellow-900/20 border border-yellow-900/50' : 'bg-gray-800/50'
+                  }`}
+                >
+                  <span
+                    className="w-3 h-3 rounded-full inline-block flex-shrink-0"
+                    style={{ backgroundColor: WONK_COLORS[wc.slot] }}
+                  />
+                  <span className="truncate text-xs text-white">{wc.name}</span>
+                  <span className={`text-xs ml-auto font-bold ${wc.wins > 0 ? 'text-yellow-400' : 'text-gray-600'}`}>
+                    {wc.wins}
+                  </span>
+                </div>
+              ))}
+          </div>
         </div>
       )}
 

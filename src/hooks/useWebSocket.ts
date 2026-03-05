@@ -18,6 +18,12 @@ export interface HorseState {
   distToGoal: number;
 }
 
+export interface WinCount {
+  slot: number;
+  name: string;
+  wins: number;
+}
+
 export interface GameState {
   horses: HorseState[];
   obstacles: { x: number; y: number; w: number; h: number }[];
@@ -29,6 +35,7 @@ export interface GameState {
   timeLeft: number;
   winner: string | null;
   bestFitnessHistory: number[];
+  winCounts: WinCount[];
 }
 
 export interface ResetVoteState {

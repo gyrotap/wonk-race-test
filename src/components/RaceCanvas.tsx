@@ -175,7 +175,7 @@ export default function RaceCanvas({ state }: Props) {
       ctx.fillStyle = '#ff6666';
       ctx.font = 'bold 20px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('No winner this gen!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 6);
+      ctx.fillText('No winner this race!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 6);
     }
   }, [state]);
 
