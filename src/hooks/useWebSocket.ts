@@ -49,8 +49,9 @@ export interface GameState {
   goalX: number;
   goalY: number;
   generation: number;
-  status: 'waiting' | 'racing' | 'finished';
+  status: 'waiting' | 'betting' | 'racing' | 'finished';
   timeLeft: number;
+  bettingTimeLeft: number;
   winner: string | null;
   bestFitnessHistory: number[];
   winCounts: WinCount[];
@@ -85,6 +86,7 @@ export function useWebSocket() {
   const [redeemMessage, setRedeemMessage] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef = useRef<GameState | null>(null);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -104,9 +106,23 @@ export function useWebSocket() {
       const msg = JSON.parse(event.data);
 
       if (msg.type === 'state') {
+        const prevStatus = stateRef.current?.status;
         setState(msg as GameState);
+        stateRef.current = msg as GameState;
         if (msg.generation === 0) {
           setHasVotedReset(false);
+        }
+        // TTS "Place your bets" when betting phase starts
+        if (msg.status === 'betting' && prevStatus !== 'betting') {
+          try {
+            const utterance = new SpeechSynthesisUtterance('Place your bets now!');
+            utterance.rate = 1.1;
+            utterance.pitch = 1.2;
+            utterance.volume = 0.8;
+            speechSynthesis.speak(utterance);
+          } catch {
+            // TTS not available
+          }
         }
         // Clear bet result when new race starts
         if (msg.status === 'racing') {

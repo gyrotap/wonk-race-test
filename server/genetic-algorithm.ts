@@ -1,6 +1,6 @@
-const MUTATION_RATE = 0.03;
-const MUTATION_STRENGTH = 0.15;
-const ELITISM_COUNT = 1;
+const MUTATION_RATE = 0.08;      // Higher mutation rate for faster exploration
+const MUTATION_STRENGTH = 0.3;   // Bigger mutations to escape local minima
+const ELITISM_COUNT = 2;         // Keep top 2 so good strategies persist
 
 interface Individual {
   genome: number[];

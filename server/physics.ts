@@ -1,9 +1,10 @@
 import { Horse } from './horse';
 import { Obstacle, Pitfall, COURSE_WIDTH, COURSE_HEIGHT } from './course';
 
-const BOUNCE_FACTOR = 1.5; // Wonks ricochet HARD
-const MIN_BOUNCE_SPEED = 3.5; // Strong minimum bounce so they never get stuck
-const DEFLECT_RANDOMNESS = 0.4; // Random angle change on bounce for chaotic trajectories
+const BOUNCE_FACTOR = 1.8; // Wonks ricochet HARD like pinball bumpers
+const MIN_BOUNCE_SPEED = 4.0; // Strong minimum bounce so they never get stuck
+const DEFLECT_RANDOMNESS = 0.5; // Random angle change on bounce for chaotic trajectories
+const WONK_COLLISION_BOUNCE = 5.0; // How hard wonks bounce off each other
 
 // Add random deflection so bounces change trajectory unpredictably
 function deflect(vx: number, vy: number): [number, number] {
@@ -142,4 +143,54 @@ export function checkPitfalls(horse: Horse, pitfalls: Pitfall[]): boolean {
     }
   }
   return false;
+}
+
+export function handleWonkCollisions(horses: Horse[]) {
+  for (let i = 0; i < horses.length; i++) {
+    const a = horses[i];
+    if (a.finished || a.dead) continue;
+
+    for (let j = i + 1; j < horses.length; j++) {
+      const b = horses[j];
+      if (b.finished || b.dead) continue;
+
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const minDist = Horse.RADIUS * 2;
+
+      if (dist < minDist && dist > 0) {
+        // Push apart
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const overlap = minDist - dist;
+        a.x -= nx * (overlap / 2 + 1);
+        a.y -= ny * (overlap / 2 + 1);
+        b.x += nx * (overlap / 2 + 1);
+        b.y += ny * (overlap / 2 + 1);
+
+        // Elastic-ish collision with pinball bounce
+        const relVx = a.vx - b.vx;
+        const relVy = a.vy - b.vy;
+        const relDot = relVx * nx + relVy * ny;
+
+        if (relDot > 0) {
+          a.vx -= relDot * nx;
+          a.vy -= relDot * ny;
+          b.vx += relDot * nx;
+          b.vy += relDot * ny;
+        }
+
+        // Add pinball bounce force pushing them apart
+        a.vx -= nx * WONK_COLLISION_BOUNCE;
+        a.vy -= ny * WONK_COLLISION_BOUNCE;
+        b.vx += nx * WONK_COLLISION_BOUNCE;
+        b.vy += ny * WONK_COLLISION_BOUNCE;
+
+        // Deflect both for chaos
+        [a.vx, a.vy] = deflect(a.vx, a.vy);
+        [b.vx, b.vy] = deflect(b.vx, b.vy);
+      }
+    }
+  }
 }

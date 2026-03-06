@@ -278,6 +278,19 @@ export default function RaceCanvas({ state }: Props) {
       ctx.fillText(`${state.timeLeft}s`, CANVAS_WIDTH - 10, 24);
     }
 
+    // Betting countdown overlay
+    if (state.status === 'betting') {
+      ctx.fillStyle = '#00000088';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 32px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('PLACE YOUR BETS!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 48px monospace';
+      ctx.fillText(`${state.bettingTimeLeft}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 40);
+    }
+
     // Winner banner
     if (state.status === 'finished' && state.winner) {
       ctx.fillStyle = '#00000088';

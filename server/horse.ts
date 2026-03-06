@@ -93,17 +93,18 @@ export class Horse {
     const dx = goalX - this.x;
     const dy = goalY - this.y;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-    const angle = Math.atan2(dy, dx) / Math.PI;
 
     return [
-      nearestWalls[0] / 800,
-      nearestWalls[1] / 800,
-      nearestWalls[2] / 600,
-      nearestWalls[3] / 600,
-      angle,
-      Math.min(dist / 800, 1),
-      this.vx / Horse.MAX_SPEED,
-      this.vy / Horse.MAX_SPEED,
+      nearestWalls[0] / 400, // left wall dist (normalized to mid-range)
+      nearestWalls[1] / 400, // right wall dist
+      nearestWalls[2] / 300, // up wall dist
+      nearestWalls[3] / 300, // down wall dist
+      dx / 400,              // goal direction x (signed, bigger range)
+      dy / 300,              // goal direction y (signed, bigger range)
+      Math.min(dist / 600, 1), // distance to goal
+      this.vx / Horse.MAX_SPEED, // current velocity x
+      this.vy / Horse.MAX_SPEED, // current velocity y
+      (this.y - 300) / 300,   // vertical position bias (-1 = top, 1 = bottom)
     ];
   }
 
@@ -154,12 +155,15 @@ export class Horse {
     const dy = goalY - this.y;
     const distToGoal = Math.sqrt(dx * dx + dy * dy);
 
-    this.fitness = Math.max(0, 1000 - distToGoal);
+    // Strong distance-based reward (squared falloff means getting close is very valuable)
+    const maxDist = 1000;
+    const normalizedDist = Math.min(distToGoal / maxDist, 1);
+    this.fitness = (1 - normalizedDist) * (1 - normalizedDist) * 2000;
 
     if (this.dead) {
       this.fitness *= 0.3;
     } else if (this.finished && this.finishTime !== null) {
-      this.fitness += 5000 + (maxTicks - this.finishTime) * 2;
+      this.fitness += 10000 + (maxTicks - this.finishTime) * 5;
     }
   }
 

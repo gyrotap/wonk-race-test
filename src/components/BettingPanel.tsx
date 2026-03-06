@@ -121,7 +121,9 @@ export default function BettingPanel({
       {!wallet.currentBet && (
         <div>
           <div className="text-gray-400 text-xs font-bold mb-1.5 uppercase tracking-wider">
-            {state.status === 'racing' ? 'Betting closed during race' : 'Place your bet'}
+            {state.status === 'racing' ? 'Betting closed during race'
+              : state.status === 'betting' ? 'PLACE YOUR BETS NOW!'
+              : 'Place your bet'}
           </div>
           <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-8 sm:gap-2">
             {(state.horses.length > 0 ? state.horses : state.winCounts).map((h) => {

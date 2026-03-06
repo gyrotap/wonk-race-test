@@ -1,7 +1,7 @@
 import { Horse, HorseState } from './horse';
 import { NeuralNetwork } from './neural-network';
 import { Course, generateCourse } from './course';
-import { handleCollisions, getNearestWalls, checkGoal, checkPitfalls } from './physics';
+import { handleCollisions, handleWonkCollisions, getNearestWalls, checkGoal, checkPitfalls } from './physics';
 import { evolve } from './genetic-algorithm';
 import { WONK_NAMES } from './names';
 import {
@@ -10,7 +10,7 @@ import {
   AUTO_FIRE_DELAY, PROJECTILE_SPEED,
 } from './powerups';
 
-export type SimStatus = 'waiting' | 'racing' | 'finished';
+export type SimStatus = 'waiting' | 'betting' | 'racing' | 'finished';
 
 export interface PowerupItemState {
   id: number;
@@ -34,6 +34,7 @@ export interface SimState {
   generation: number;
   status: SimStatus;
   timeLeft: number;
+  bettingTimeLeft: number;
   winner: string | null;
   bestFitnessHistory: number[];
   winCounts: { slot: number; name: string; wins: number }[];
@@ -42,9 +43,10 @@ export interface SimState {
 }
 
 const POPULATION_SIZE = 8;
-const MAX_TICKS = 1800; // 30 seconds at 60fps
+const MAX_TICKS = 2400; // 40 seconds at 60fps
 const TICK_RATE = 1000 / 60;
 const BROADCAST_EVERY = 2;
+const BETTING_COUNTDOWN_TICKS = 600; // 10 seconds at 60fps
 
 export class Simulation {
   horses: Horse[] = [];
@@ -52,6 +54,7 @@ export class Simulation {
   generation: number = 0;
   status: SimStatus = 'waiting';
   ticks: number = 0;
+  bettingTicks: number = 0;
   winner: string | null = null;
   bestFitnessHistory: number[] = [];
   winCounts: number[] = new Array(8).fill(0);
@@ -88,6 +91,9 @@ export class Simulation {
       generation: this.generation,
       status: this.status,
       timeLeft: Math.max(0, Math.ceil((MAX_TICKS - this.ticks) / 60)),
+      bettingTimeLeft: this.status === 'betting'
+        ? Math.max(0, Math.ceil((BETTING_COUNTDOWN_TICKS - this.bettingTicks) / 60))
+        : 0,
       winner: this.winner,
       bestFitnessHistory: this.bestFitnessHistory,
       winCounts: WONK_NAMES.map((name, slot) => ({ slot, name, wins: this.winCounts[slot] })),
@@ -159,12 +165,12 @@ export class Simulation {
   }
 
   startNextGeneration() {
-    if (this.status === 'racing') return;
+    if (this.status === 'racing' || this.status === 'betting') return;
 
     this.generation++;
     this.ticks = 0;
+    this.bettingTicks = 0;
     this.winner = null;
-    this.status = 'racing';
     this.projectiles = [];
 
     const baseObstacles = 10;
@@ -197,10 +203,31 @@ export class Simulation {
       return horse;
     });
 
+    // Start betting countdown
+    this.status = 'betting';
     if (this.tickInterval) clearInterval(this.tickInterval);
-    this.tickInterval = setInterval(() => this.tick(), TICK_RATE);
+    this.tickInterval = setInterval(() => this.bettingTick(), TICK_RATE);
 
     this.onBroadcast(this.getState());
+  }
+
+  private bettingTick() {
+    this.bettingTicks++;
+
+    if (this.bettingTicks >= BETTING_COUNTDOWN_TICKS) {
+      // Transition to racing
+      this.status = 'racing';
+      this.ticks = 0;
+      if (this.tickInterval) clearInterval(this.tickInterval);
+      this.tickInterval = setInterval(() => this.tick(), TICK_RATE);
+      this.onBroadcast(this.getState());
+      return;
+    }
+
+    // Broadcast every few ticks so clients see the countdown
+    if (this.bettingTicks % 6 === 0) {
+      this.onBroadcast(this.getState());
+    }
   }
 
   private tick() {
@@ -265,6 +292,9 @@ export class Simulation {
         }
       }
     }
+
+    // Wonk-to-wonk pinball collisions
+    handleWonkCollisions(this.horses);
 
     const allFinished = this.horses.every(h => h.finished || h.dead);
     if (allFinished || this.ticks >= MAX_TICKS) {
@@ -350,6 +380,7 @@ export class Simulation {
     this.generation = 0;
     this.status = 'waiting';
     this.ticks = 0;
+    this.bettingTicks = 0;
     this.winner = null;
     this.bestFitnessHistory = [];
     this.winCounts = new Array(8).fill(0);

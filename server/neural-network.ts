@@ -1,9 +1,9 @@
 export class NeuralNetwork {
   weights: number[];
 
-  // 8 inputs -> 6 hidden -> 2 outputs
-  static readonly INPUT_SIZE = 8;
-  static readonly HIDDEN_SIZE = 6;
+  // 10 inputs -> 10 hidden -> 2 outputs
+  static readonly INPUT_SIZE = 10;
+  static readonly HIDDEN_SIZE = 10;
   static readonly OUTPUT_SIZE = 2;
 
   static readonly GENOME_LENGTH =
@@ -14,9 +14,9 @@ export class NeuralNetwork {
     if (weights) {
       this.weights = [...weights];
     } else {
-      // Larger random weights so early gens move aggressively in random directions
+      // Balanced random weights — enough to move but not saturate tanh
       this.weights = Array.from({ length: NeuralNetwork.GENOME_LENGTH }, () =>
-        (Math.random() - 0.5) * 2.0
+        (Math.random() - 0.5) * 1.0
       );
     }
   }
