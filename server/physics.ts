@@ -30,35 +30,65 @@ function ensureMinBounce(vx: number, vy: number): [number, number] {
 
 export function handleCollisions(horse: Horse, obstacles: Obstacle[]) {
   const r = Horse.RADIUS;
+  const CORNER_MARGIN = r + 30; // detect corners generously
 
-  // Boundary collisions — aggressive bounce off walls
+  // Check if in a corner (near two walls simultaneously)
+  const nearLeft = horse.x < CORNER_MARGIN;
+  const nearRight = horse.x > COURSE_WIDTH - CORNER_MARGIN;
+  const nearTop = horse.y < CORNER_MARGIN;
+  const nearBottom = horse.y > COURSE_HEIGHT - CORNER_MARGIN;
+  const inCorner = (nearLeft || nearRight) && (nearTop || nearBottom);
+
+  // Boundary collisions
+  let hitX = false, hitY = false;
   if (horse.x - r < 0) {
-    horse.x = r;
+    horse.x = r + 2;
     horse.vx = Math.abs(horse.vx) * BOUNCE_FACTOR;
-    [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
-    [horse.vx, horse.vy] = deflect(horse.vx, horse.vy);
-    horse.vx = Math.abs(horse.vx); // ensure still going right after deflect
+    hitX = true;
   }
   if (horse.x + r > COURSE_WIDTH) {
-    horse.x = COURSE_WIDTH - r;
+    horse.x = COURSE_WIDTH - r - 2;
     horse.vx = -Math.abs(horse.vx) * BOUNCE_FACTOR;
-    [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
-    [horse.vx, horse.vy] = deflect(horse.vx, horse.vy);
-    horse.vx = -Math.abs(horse.vx); // ensure still going left after deflect
+    hitX = true;
   }
   if (horse.y - r < 0) {
-    horse.y = r;
+    horse.y = r + 2;
     horse.vy = Math.abs(horse.vy) * BOUNCE_FACTOR;
-    [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
-    [horse.vx, horse.vy] = deflect(horse.vx, horse.vy);
-    horse.vy = Math.abs(horse.vy); // ensure still going down after deflect
+    hitY = true;
   }
   if (horse.y + r > COURSE_HEIGHT) {
-    horse.y = COURSE_HEIGHT - r;
+    horse.y = COURSE_HEIGHT - r - 2;
     horse.vy = -Math.abs(horse.vy) * BOUNCE_FACTOR;
-    [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
-    [horse.vx, horse.vy] = deflect(horse.vx, horse.vy);
-    horse.vy = -Math.abs(horse.vy); // ensure still going up after deflect
+    hitY = true;
+  }
+
+  if (hitX || hitY) {
+    if (inCorner) {
+      // Corner escape: launch toward center with strong force
+      const cx = COURSE_WIDTH / 2;
+      const cy = COURSE_HEIGHT / 2;
+      const dx = cx - horse.x;
+      const dy = cy - horse.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const launchSpeed = MIN_BOUNCE_SPEED * 2.5;
+      horse.vx = (dx / dist) * launchSpeed;
+      horse.vy = (dy / dist) * launchSpeed;
+      // Push away from corner
+      horse.x += horse.vx * 0.5;
+      horse.y += horse.vy * 0.5;
+    } else {
+      [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
+      [horse.vx, horse.vy] = deflect(horse.vx, horse.vy);
+      // Re-enforce correct direction after deflect
+      if (hitX) {
+        if (horse.x < COURSE_WIDTH / 2) horse.vx = Math.abs(horse.vx);
+        else horse.vx = -Math.abs(horse.vx);
+      }
+      if (hitY) {
+        if (horse.y < COURSE_HEIGHT / 2) horse.vy = Math.abs(horse.vy);
+        else horse.vy = -Math.abs(horse.vy);
+      }
+    }
   }
 
   // Obstacle collisions (AABB vs circle) — chaotic bouncing with trajectory change
@@ -95,6 +125,18 @@ export function handleCollisions(horse: Horse, obstacles: Obstacle[]) {
         [horse.vx, horse.vy] = deflect(horse.vx, horse.vy);
       }
       [horse.vx, horse.vy] = ensureMinBounce(horse.vx, horse.vy);
+
+      // If still near a wall/corner after obstacle bounce, push toward center
+      if (horse.x < r + 5 || horse.x > COURSE_WIDTH - r - 5 ||
+          horse.y < r + 5 || horse.y > COURSE_HEIGHT - r - 5) {
+        const cx = COURSE_WIDTH / 2;
+        const cy = COURSE_HEIGHT / 2;
+        const toCenterX = cx - horse.x;
+        const toCenterY = cy - horse.y;
+        const toDist = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY) || 1;
+        horse.vx += (toCenterX / toDist) * 2;
+        horse.vy += (toCenterY / toDist) * 2;
+      }
     }
   }
 }

@@ -43,7 +43,7 @@ export interface SimState {
 }
 
 const POPULATION_SIZE = 8;
-const MAX_TICKS = 2400; // 40 seconds at 60fps
+const MAX_TICKS = 1800; // 30 seconds at 60fps
 const TICK_RATE = 1000 / 60;
 const BROADCAST_EVERY = 2;
 const BETTING_COUNTDOWN_TICKS = 600; // 10 seconds at 60fps
